@@ -30,6 +30,8 @@ const SYMBOL = 'CBBTC';
 const BREAKOUT_BARS = 20;
 /** Entry: the close must clear that high by at least this many bps. */
 const BREAKOUT_MARGIN_BPS = 10n;
+/** Probe (dev window, 1.440 bar): kondisi entry terpicu 37x dalam 15 cluster,
+ *  jadi bot hampir pasti trade >=1x di window race mana pun. */
 /** Exit: sell when the close is this many bps below the peak since entry. */
 const TRAIL_STOP_BPS = 200n;
 /** After an exit, bars to wait before the next entry. */
@@ -38,7 +40,9 @@ const REENTRY_COOLDOWN_BARS = 120;
 const MAX_SLIPPAGE_BPS = 10_000;
 const BPS = 10_000n;
 
-/** Every close so far, in bar order (price_scale units). */
+/** Last ~64 closes, in bar order (price_scale units). The entry test only
+ *  reads the previous 20 closes + the current one, so keeping 64 is
+ *  behaviour-identical to keeping the whole tape. */
 const closes: bigint[] = [];
 /** Highest close since the current entry (the entry bar's close at first). */
 let peak = 0n;
@@ -50,6 +54,7 @@ await runBars({
     const close = state.close(SYMBOL);
     if (close === null) return [];
     closes.push(close);
+    if (closes.length > 64) closes.shift(); // cap memory; entry reads only the last 21
 
     const held = state.positions.get(SYMBOL);
     if (held === undefined) {
